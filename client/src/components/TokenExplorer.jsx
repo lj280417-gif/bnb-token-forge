@@ -53,10 +53,12 @@ export function TokenExplorer({
     return `linear-gradient(135deg, hsl(${hue1}, 80%, 45%), hsl(${hue2}, 90%, 55%))`;
   };
 
+  const activeChain = chainId === 56 ? 56 : 97;
+
   // Cargar estadísticas globales
   const fetchStats = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/tokens/stats/summary?chainId=97`);
+      const res = await fetch(`${API_BASE_URL}/tokens/stats/summary?chainId=${activeChain}`);
       const data = await res.json();
       if (data.success && data.stats) {
         setStats(data.stats);
@@ -73,7 +75,7 @@ export function TokenExplorer({
 
     try {
       const params = new URLSearchParams();
-      params.append("chainId", "97");
+      params.append("chainId", activeChain.toString());
       params.append("page", page.toString());
       params.append("limit", "12");
       params.append("sort", sortBy);

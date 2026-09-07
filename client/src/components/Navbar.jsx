@@ -76,15 +76,26 @@ export function Navbar({
           </a>
         )}
 
-        {/* Network Selector */}
+        {/* Network Selector Multi-Red */}
         <div className="network-selector">
           <button 
             className="network-dropdown-btn"
             onClick={() => switchNetwork(isTestnet ? 56 : 97)}
-            title="Clic para alternar entre Testnet y Mainnet"
+            title={isTestnet ? "Cambiar a BSC Mainnet (En Preparación)" : "Cambiar a BSC Testnet (Activo)"}
           >
             <span className={`network-dot ${isTestnet ? "testnet" : ""}`}></span>
-            <span>{currentNetwork ? currentNetwork.chainName : "Cambiar Red"}</span>
+            <span>{currentNetwork ? (currentNetwork.shortName || currentNetwork.chainName) : "Cambiar Red"}</span>
+            <span style={{ 
+              fontSize: "0.68rem", 
+              padding: "1px 6px", 
+              borderRadius: "4px", 
+              background: isTestnet ? "rgba(16, 185, 129, 0.15)" : "rgba(240, 185, 11, 0.15)",
+              color: isTestnet ? "var(--emerald)" : "var(--bnb-gold)",
+              fontWeight: 700,
+              marginLeft: "4px"
+            }}>
+              {isTestnet ? "Activo" : "En Prep."}
+            </span>
             <ChevronDown size={14} />
           </button>
         </div>

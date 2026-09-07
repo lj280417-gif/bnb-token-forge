@@ -58,20 +58,20 @@ export function DeploymentModal({
       id: 1,
       title: isFactory ? "Preparación de TokenFactory" : "Validación y Preparación",
       desc: isFactory 
-        ? "Conectando con TokenFactory en 0x9ec6...e99C" 
+        ? `Conectando con TokenFactory en ${currentNetwork.shortName || currentNetwork.chainName}` 
         : "Validando parámetros y compilando bytecode BEP-20",
     },
     {
       id: 2,
       title: "Firma en MetaMask",
       desc: isFactory 
-        ? "Confirma llamada a createToken con valor de 0.01 tBNB" 
+        ? `Confirma llamada a createToken con valor de ${currentNetwork.factoryFee || "0.01"} ${currentNetwork.symbol}` 
         : "Confirma la transacción de despliegue en tu billetera",
     },
     {
       id: 3,
       title: "Minado en BNB Smart Chain",
-      desc: "Esperando confirmación del bloque en la red",
+      desc: `Esperando confirmación del bloque en ${currentNetwork.shortName}`,
     },
   ];
 
@@ -84,7 +84,7 @@ export function DeploymentModal({
               ? "🎉 ¡Token Creado con Éxito!" 
               : status === "error" 
               ? "Error en la Transacción" 
-              : isFactory ? "Creando en TokenFactory..." : "Desplegando en BSC..."}
+              : isFactory ? "Creando en TokenFactory..." : `Desplegando en ${currentNetwork.shortName}...`}
           </h3>
           {status !== "loading" && (
             <button className="modal-close-btn" onClick={onClose}>
@@ -140,7 +140,9 @@ export function DeploymentModal({
             <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.82rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "var(--text-secondary)" }}>Contrato Destino:</span>
-                <span style={{ fontFamily: "var(--font-mono)", color: "var(--bnb-gold)", fontWeight: 600 }}>0x9ec66BA9A2A7ee7628c9695f293D0651F651e99C</span>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--bnb-gold)", fontWeight: 600 }}>
+                  {currentNetwork.factoryAddress || "No asignado"}
+                </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "var(--text-secondary)" }}>Función:</span>
@@ -148,15 +150,17 @@ export function DeploymentModal({
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "var(--text-secondary)" }}>Valor a Enviar (Value):</span>
-                <span style={{ color: "var(--bnb-gold)", fontWeight: 800 }}>0.01 tBNB</span>
+                <span style={{ color: "var(--bnb-gold)", fontWeight: 800 }}>
+                  {currentNetwork.factoryFee || "0.01"} {currentNetwork.symbol}
+                </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "var(--text-secondary)" }}>Red:</span>
-                <span>BNB Smart Chain Testnet (Chain ID 97)</span>
+                <span>{currentNetwork.chainName} (Chain ID {currentNetwork.chainIdDecimal})</span>
               </div>
             </div>
             <div style={{ marginTop: "10px", fontSize: "0.78rem", color: "var(--text-muted)", fontStyle: "italic" }}>
-              ℹ️ Verifica en la ventana emergente de MetaMask que el destino sea <strong>0x9ec6...e99C</strong> y el valor sea <strong>0.01 BNB</strong> antes de confirmar.
+              ℹ️ Verifica en la ventana emergente de MetaMask que el destino sea <strong>{shortenAddress(currentNetwork.factoryAddress || "0x0000", 6)}</strong> y el valor sea <strong>{currentNetwork.factoryFee || "0.01"} {currentNetwork.symbol}</strong> antes de confirmar.
             </div>
           </div>
         )}

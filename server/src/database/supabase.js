@@ -267,7 +267,7 @@ async function getTokenStats(chainId = 97) {
         directTokens: directCount,
         uniqueCreators,
         chainId: Number(chainId),
-        network: "BSC Testnet",
+        network: Number(chainId) === 56 ? "BSC Mainnet" : "BSC Testnet",
         isSupabaseActive: true
       };
     } catch (sbErr) {
@@ -286,7 +286,7 @@ async function getTokenStats(chainId = 97) {
     directTokens: directCount,
     uniqueCreators,
     chainId: Number(chainId),
-    network: "BSC Testnet",
+    network: Number(chainId) === 56 ? "BSC Mainnet" : "BSC Testnet",
     isSupabaseActive: false
   };
 }

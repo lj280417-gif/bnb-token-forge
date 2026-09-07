@@ -7,7 +7,10 @@ const {
 } = require("../database/supabase");
 
 const BSC_TESTNET_RPC = process.env.BSC_TESTNET_RPC || "https://data-seed-prebsc-1-s1.binance.org:8545/";
+const BSC_MAINNET_RPC = process.env.BSC_MAINNET_RPC || "https://bsc-dataseed.binance.org/";
+
 const testnetProvider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC);
+const mainnetProvider = new ethers.JsonRpcProvider(BSC_MAINNET_RPC);
 
 /**
  * Registra o actualiza un token en la base de datos central después de confirmarse on-chain
@@ -63,33 +66,46 @@ async function registerToken(req, res) {
       });
     }
 
-    // 2. Restricción estricta de red: Exclusivamente BSC Testnet (97)
+    // 2. Validación de red y Candado de Seguridad Multi-Red
     const activeChainId = Number(chainId || 97);
-    if (activeChainId !== 97) {
+    if (activeChainId !== 97 && activeChainId !== 56) {
       return res.status(400).json({
         success: false,
-        message: "Actualmente solo se admite la red BNB Smart Chain Testnet (Chain ID 97)."
+        message: "Red no admitida. Actualmente solo se admite BNB Smart Chain Testnet (97) y Mainnet (56)."
+      });
+    }
+
+    // CANDADO DE SEGURIDAD: Mainnet está desactivado para registro por defecto
+    const isMainnetEnabled = process.env.ENABLE_BSC_MAINNET === "true";
+    if (activeChainId === 56 && !isMainnetEnabled) {
+      return res.status(403).json({
+        success: false,
+        message: "El registro de tokens en BNB Smart Chain Mainnet (Chain ID 56) está temporalmente desactivado."
       });
     }
 
     // 3. Validación On-Chain Anti-Spam: Verificar que la dirección realmente tiene código desplegado
+    const rpcProvider = activeChainId === 56 ? mainnetProvider : testnetProvider;
+    const networkLabel = activeChainId === 56 ? "BSC Mainnet (Chain ID 56)" : "BSC Testnet (Chain ID 97)";
+
     try {
-      const code = await testnetProvider.getCode(address);
+      const code = await rpcProvider.getCode(address);
       if (!code || code === "0x") {
         return res.status(400).json({
           success: false,
-          message: `La dirección ${address} no contiene bytecode desplegado en BSC Testnet (Chain ID 97). No es un contrato válido.`
+          message: `La dirección ${address} no contiene bytecode desplegado en ${networkLabel}. No es un contrato válido.`
         });
       }
     } catch (rpcErr) {
-      console.warn("⚠️ Aviso al verificar getCode en BSC Testnet:", rpcErr.message);
+      console.warn(`⚠️ Aviso al verificar getCode en ${networkLabel}:`, rpcErr.message);
       // En caso de fallo transitorio del nodo RPC público de Binance, continuamos la validación
     }
 
     // 4. Guardar o actualizar en la base de datos central
+    const defaultFee = activeChainId === 56 ? "0.01 BNB" : "0.01 tBNB";
     const tokenRecord = await upsertToken({
       address,
-      chainId: 97,
+      chainId: activeChainId,
       name: name.trim(),
       symbol: symbol.trim().toUpperCase(),
       decimals: Number(decimals || 18),
@@ -99,7 +115,7 @@ async function registerToken(req, res) {
       verified: Boolean(verified),
       creationMethod: creationMethod || "factory",
       factoryAddress: factoryAddress || null,
-      feePaid: feePaid || (creationMethod === "factory" ? "0.01 tBNB" : "0 tBNB"),
+      feePaid: feePaid || (creationMethod === "factory" ? defaultFee : `0 ${activeChainId === 56 ? 'BNB' : 'tBNB'}`),
       canBurn: Boolean(canBurn),
       canMint: Boolean(canMint),
       createdAt: req.body.createdAt || req.body.timestamp || Date.now()

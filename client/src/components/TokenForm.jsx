@@ -1,4 +1,3 @@
-import React, { useEffect } from "react";
 import { 
   Sparkles, 
   Coins, 
@@ -11,9 +10,10 @@ import {
   KeyRound, 
   Wallet, 
   ArrowRight, 
-  AlertCircle 
+  AlertCircle,
+  ShieldAlert
 } from "lucide-react";
-import { TOKEN_FACTORY_ADDRESS, TOKEN_FACTORY_FEE } from "../utils/constants";
+import { getNetworkConfig } from "../utils/constants";
 import { shortenAddress } from "../utils/formatters";
 
 export function TokenForm({ 
@@ -28,6 +28,8 @@ export function TokenForm({
   deployMode = "factory", 
   setDeployMode 
 }) {
+  const currentNetwork = getNetworkConfig(chainId);
+  const isMainnetBlocked = !currentNetwork.isAvailable;
 
   // Auto-asignar la wallet conectada al campo de owner si está vacío
   useEffect(() => {
@@ -267,7 +269,7 @@ export function TokenForm({
         {/* Sección 4: Método de Creación (Fase 2 TokenFactory vs Flujo Directo) */}
         <div className="form-section">
           <div className="section-label">
-            <Layers size={14} /> Método de Creación en BSC Testnet
+            <Layers size={14} /> Método de Creación en {currentNetwork.shortName || currentNetwork.chainName}
           </div>
 
           <div className="deployment-modes-grid">
@@ -284,10 +286,10 @@ export function TokenForm({
                 Crear mediante TokenFactory
               </div>
               <div className="mode-desc">
-                Crea tu BEP-20 a través de la fábrica oficial. Asigna 100% de propiedad y suministro a tu wallet.
+                Crea tu BEP-20 a través de la fábrica descentralizada. Asigna 100% de propiedad y suministro a tu wallet.
               </div>
               <div className="mode-fee-tag">
-                Tarifa: 0.01 tBNB + gas
+                Tarifa: {currentNetwork.factoryFee || "0.01"} {currentNetwork.symbol} + gas
               </div>
             </div>
 
@@ -307,7 +309,7 @@ export function TokenForm({
                 Despliega StandardBEP20 de forma independiente sin interactuar con el Factory.
               </div>
               <div className="mode-fee-tag" style={{ color: "var(--cyan)" }}>
-                Solo gas de BSC Testnet (~0.003 tBNB)
+                Solo gas de {currentNetwork.shortName} (~0.003 {currentNetwork.symbol})
               </div>
             </div>
           </div>
@@ -335,7 +337,7 @@ export function TokenForm({
         </div>
 
         {/* Tarjeta de Verificación de Transacción antes de abrir MetaMask */}
-        {account && deployMode === "factory" && (
+        {account && deployMode === "factory" && !isMainnetBlocked && (
           <div className="tx-verification-card">
             <div className="tx-verification-title">
               <ShieldCheck size={16} />
@@ -345,7 +347,7 @@ export function TokenForm({
               <div className="tx-verification-row">
                 <span className="tx-verification-label">Contrato Destino (Factory):</span>
                 <span className="tx-verification-val font-mono" style={{ color: "var(--bnb-gold)" }}>
-                  {TOKEN_FACTORY_ADDRESS}
+                  {currentNetwork.factoryAddress || "Pendiente de Despliegue"}
                 </span>
               </div>
               <div className="tx-verification-row">
@@ -357,13 +359,13 @@ export function TokenForm({
               <div className="tx-verification-row">
                 <span className="tx-verification-label">Valor de la Transacción (Value):</span>
                 <span className="tx-verification-val" style={{ color: "var(--bnb-gold)", fontSize: "0.95rem", fontWeight: 800 }}>
-                  0.01 tBNB
+                  {currentNetwork.factoryFee || "0.01"} {currentNetwork.symbol}
                 </span>
               </div>
               <div className="tx-verification-row">
                 <span className="tx-verification-label">Red Blockchain:</span>
                 <span className="tx-verification-val">
-                  BNB Smart Chain Testnet (Chain ID 97)
+                  {currentNetwork.chainName} (Chain ID {currentNetwork.chainIdDecimal})
                 </span>
               </div>
               <div className="tx-verification-row">
@@ -376,8 +378,33 @@ export function TokenForm({
           </div>
         )}
 
-        {/* Botones de Acción Claramente Diferenciados */}
-        {account ? (
+        {/* Bloqueo Seguro para Mainnet o Botones de Acción */}
+        {isMainnetBlocked ? (
+          <div style={{
+            background: "rgba(240, 185, 11, 0.08)",
+            border: "1px solid rgba(240, 185, 11, 0.3)",
+            borderRadius: "var(--radius-md)",
+            padding: "16px",
+            marginTop: "16px",
+            textAlign: "center"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", color: "var(--bnb-gold)", fontWeight: 700, marginBottom: "6px" }}>
+              <ShieldAlert size={18} />
+              <span>Creación en BSC Mainnet Bloqueada</span>
+            </div>
+            <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: "1.5", marginBottom: "12px" }}>
+              {currentNetwork.disabledReason || "BNB Smart Chain Mainnet está en preparación y desactivada para transacciones con fondos reales."}
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled
+              style={{ width: "100%", opacity: 0.6, cursor: "not-allowed", padding: "12px" }}
+            >
+              🔒 Creación Desactivada en Mainnet
+            </button>
+          </div>
+        ) : account ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
             {/* Opción 1: Crear mediante TokenFactory */}
             <button 
@@ -390,11 +417,11 @@ export function TokenForm({
               <span>
                 {isDeploying && deployMode === "factory" 
                   ? "Procesando en TokenFactory..." 
-                  : "Crear token mediante TokenFactory (0.01 tBNB)"}
+                  : `Crear token mediante TokenFactory (${currentNetwork.factoryFee || "0.01"} ${currentNetwork.symbol})`}
               </span>
             </button>
 
-            {/* Opción 2: Despliegue Directo Standalone (Mantiene el flujo original) */}
+            {/* Opción 2: Despliegue Directo Standalone */}
             <button 
               type="button" 
               className="deploy-direct-action-btn"
@@ -406,7 +433,7 @@ export function TokenForm({
               <span>
                 {isDeploying && deployMode === "direct" 
                   ? "Desplegando directo..." 
-                  : "Desplegar Token en BSC Testnet (Directo)"}
+                  : `Desplegar Token en ${currentNetwork.shortName} (Directo)`}
               </span>
             </button>
           </div>

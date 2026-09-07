@@ -21,6 +21,7 @@ import { DeploymentModal } from "./components/DeploymentModal";
 import { FactoryDeployModal } from "./components/FactoryDeployModal";
 import { DeployedTokensList } from "./components/DeployedTokensList";
 import { TokenExplorer } from "./components/TokenExplorer";
+import { TokenResultScreen } from "./components/TokenResultScreen";
 
 
 import { useWeb3 } from "./hooks/useWeb3";
@@ -28,6 +29,7 @@ import {
   API_BASE_URL, 
   DEFAULT_TOKEN_CONFIG, 
   NETWORKS, 
+  getNetworkConfig,
   TOKEN_FACTORY_ADDRESS, 
   TOKEN_FACTORY_FEE 
 } from "./utils/constants";
@@ -68,6 +70,7 @@ export function App() {
 
   // Estado del modal de despliegue
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [createdTokenResult, setCreatedTokenResult] = useState(null);
   const [deploymentState, setDeploymentState] = useState({
     step: 1,
     status: "idle", // 'idle' | 'loading' | 'success' | 'error'
@@ -209,25 +212,37 @@ export function App() {
       return;
     }
 
-    // Verificar que esté conectado a BSC Testnet (Chain ID 97)
-    if (chainId !== 97) {
+    const activeNetConfig = getNetworkConfig(chainId);
+
+    // Candado de seguridad: Si la red activa está bloqueada para creación (como BSC Mainnet en preparación)
+    if (!activeNetConfig.isAvailable) {
+      setValidationErrors([
+        activeNetConfig.disabledReason || "La creación de tokens en esta red está temporalmente desactivada. Cambia a BSC Testnet (Chain ID 97) para continuar."
+      ]);
+      window.scrollTo({ top: 400, behavior: "smooth" });
+      return;
+    }
+
+    // Si la billetera está en una red no BSC
+    if (chainId !== 97 && chainId !== 56) {
       const switched = await switchNetwork(97);
       if (!switched) {
         setValidationErrors([
-          "Debes estar conectado a la red BNB Smart Chain Testnet (Chain ID 97) para realizar la creación del token. Por favor, confirma el cambio de red en MetaMask."
+          "Debes estar conectado a la red BNB Smart Chain para realizar la creación del token. Por favor, confirma el cambio de red en MetaMask."
         ]);
         window.scrollTo({ top: 400, behavior: "smooth" });
         return;
       }
     }
 
-    // Comprobar saldo de tBNB según el método
+    // Comprobar saldo nativo según la red
     const currentBnbBalance = parseFloat(balance);
-    const minRequired = method === "factory" ? 0.014 : 0.003;
+    const requiredFee = parseFloat(activeNetConfig.factoryFee || "0.01");
+    const minRequired = method === "factory" ? (requiredFee + 0.004) : 0.003;
     if (!isNaN(currentBnbBalance) && currentBnbBalance < minRequired) {
       const msg = method === "factory"
-        ? `Saldo insuficiente de tBNB en BSC Testnet (tu saldo actual es ${balance} tBNB). Para crear el token a través de TokenFactory se requiere la comisión de servicio de 0.01 tBNB más gas (~0.003 a 0.005 tBNB). Haz clic en el botón 'tBNB Faucet' en la barra superior para recibir saldo gratis en tu MetaMask.`
-        : `Saldo insuficiente de tBNB para pagar el gas de despliegue directo en BSC Testnet (tu saldo actual es ${balance} tBNB). Se necesitan aproximadamente ~0.003 a 0.005 tBNB de gas. Haz clic en el botón 'tBNB Faucet' para recibir saldo gratis.`;
+        ? `Saldo insuficiente de ${activeNetConfig.symbol} en ${activeNetConfig.shortName} (tu saldo actual es ${balance} ${activeNetConfig.symbol}). Para crear el token a través de TokenFactory se requiere la comisión de servicio de ${activeNetConfig.factoryFee} ${activeNetConfig.symbol} más gas (~0.003 a 0.005 ${activeNetConfig.symbol}). ${activeNetConfig.isTestnet ? "Haz clic en el botón 'tBNB Faucet' en la barra superior para recibir saldo gratis." : ""}`
+        : `Saldo insuficiente de ${activeNetConfig.symbol} para pagar el gas de despliegue directo en ${activeNetConfig.shortName} (tu saldo actual es ${balance} ${activeNetConfig.symbol}). Se necesitan aproximadamente ~0.003 a 0.005 ${activeNetConfig.symbol} de gas.`;
       setValidationErrors([msg]);
       window.scrollTo({ top: 400, behavior: "smooth" });
       return;
@@ -235,6 +250,7 @@ export function App() {
 
     setIsDeploying(true);
     setIsModalOpen(true);
+    setCreatedTokenResult(null);
     setDeploymentState({
       step: 1,
       status: "loading",
@@ -257,14 +273,17 @@ export function App() {
           throw new Error("No se pudo obtener el artefacto compilado de TokenFactory desde el servidor.");
         }
 
-        // Dirección oficial de TokenFactory desplegada en BSC Testnet
-        const factoryAddress = TOKEN_FACTORY_ADDRESS;
+        // Dirección de TokenFactory según la red activa
+        const factoryAddress = activeNetConfig.factoryAddress;
+        if (!factoryAddress) {
+          throw new Error(`No hay un contrato TokenFactory configurado para la red ${activeNetConfig.chainName}.`);
+        }
         const factoryContract = new ethers.Contract(factoryAddress, artifactData.abi, signer);
 
-        // Paso 2: Firma en MetaMask con destino a TokenFactory y valor = 0.01 tBNB
+        // Paso 2: Firma en MetaMask con destino a TokenFactory y valor configurado
         setDeploymentState(prev => ({ ...prev, step: 2, method: "factory" }));
 
-        const feeWei = ethers.parseEther(TOKEN_FACTORY_FEE); // exactamente 0.01 tBNB
+        const feeWei = ethers.parseEther(activeNetConfig.factoryFee || "0.01");
         const tx = await factoryContract.createToken(
           formData.name.trim(),
           formData.symbol.trim().toUpperCase(),
@@ -316,7 +335,7 @@ export function App() {
         refreshBalance();
 
         // Guardar en historial local y base de datos central
-        const currentNet = NETWORKS[chainId] || NETWORKS[97];
+        const currentNet = activeNetConfig;
         const newTokenRecord = {
           name: formData.name.trim(),
           symbol: formData.symbol.trim().toUpperCase(),
@@ -333,11 +352,24 @@ export function App() {
           timestamp: Date.now(),
           creationMethod: "factory",
           factoryAddress: factoryAddress,
-          feePaid: `${TOKEN_FACTORY_FEE} tBNB`
+          feePaid: `${currentNet.factoryFee} ${currentNet.symbol}`
         };
 
         setDeployedTokens(prev => [newTokenRecord, ...prev]);
         registerTokenInBackend(newTokenRecord);
+
+        // Cerrar automáticamente el modal/estado de creación y mostrar pantalla de resultado
+        setIsModalOpen(false);
+        setIsDeploying(false);
+        setCreatedTokenResult(newTokenRecord);
+
+        // Desplazar suavemente a la pantalla de resultado para PC y móvil
+        setTimeout(() => {
+          const resultElem = document.getElementById("token-result-screen");
+          if (resultElem) {
+            resultElem.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 100);
 
       } else {
         // ============================================
@@ -418,6 +450,19 @@ export function App() {
 
         setDeployedTokens(prev => [newTokenRecord, ...prev]);
         registerTokenInBackend(newTokenRecord);
+
+        // Cerrar automáticamente el modal/estado de creación y mostrar pantalla de resultado
+        setIsModalOpen(false);
+        setIsDeploying(false);
+        setCreatedTokenResult(newTokenRecord);
+
+        // Desplazar suavemente a la pantalla de resultado para PC y móvil
+        setTimeout(() => {
+          const resultElem = document.getElementById("token-result-screen");
+          if (resultElem) {
+            resultElem.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 100);
       }
 
     } catch (err) {
@@ -553,8 +598,27 @@ export function App() {
         />
       ) : (
         <>
-          {/* Fase 2: Banner de Estado de TokenFactory */}
-          {factoryInfo ? (
+          {/* Banner de Estado según la Red Activa */}
+          {chainId === 56 ? (
+            <div className="factory-status-banner" style={{ borderColor: "rgba(240, 185, 11, 0.3)" }}>
+              <div className="factory-banner-info">
+                <span className="factory-badge" style={{ background: "rgba(240, 185, 11, 0.15)", color: "var(--bnb-gold)" }}>
+                  <Sparkles size={12} /> BSC Mainnet · En Preparación
+                </span>
+                <h3 className="factory-banner-title">TokenFactory en BSC Mainnet (Bloqueado)</h3>
+                <p className="factory-banner-desc">
+                  La fábrica en Mainnet está en fase de preparación y desactivada para transacciones reales. Las pruebas se realizan exclusivamente en <strong>BSC Testnet (Chain ID 97)</strong>.
+                </p>
+              </div>
+              <button 
+                className="deploy-factory-btn"
+                onClick={() => switchNetwork(97)}
+                style={{ background: "var(--bnb-gold)", color: "#000", fontWeight: 700 }}
+              >
+                <Zap size={16} /> Cambiar a BSC Testnet
+              </button>
+            </div>
+          ) : factoryInfo ? (
             <div className="factory-active-banner">
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span className="factory-badge-active">✅ TokenFactory Activo</span>
@@ -635,23 +699,33 @@ export function App() {
             </div>
           </section>
 
-          {/* Grid Principal: Formulario + Vista Previa Holográfica */}
-          <main className="workspace-grid">
-            <TokenForm 
-              formData={formData}
-              setFormData={setFormData}
-              account={account}
-              chainId={chainId}
-              onDeploy={handleDeployToken}
-              isDeploying={isDeploying}
-              validationErrors={validationErrors}
-              connectWallet={connectWallet}
-              deployMode={deployMode}
-              setDeployMode={setDeployMode}
-            />
+          {/* Grid Principal: Formulario / Pantalla de Resultado + Vista Previa Holográfica */}
+          <main className="workspace-grid" id="token-result-screen">
+            {createdTokenResult ? (
+              <TokenResultScreen 
+                token={createdTokenResult}
+                onAddToMetaMask={addTokenToMetaMask}
+                onVerifyContract={handleVerifyContract}
+                onCreateAnother={() => setCreatedTokenResult(null)}
+                chainId={chainId}
+              />
+            ) : (
+              <TokenForm 
+                formData={formData}
+                setFormData={setFormData}
+                account={account}
+                chainId={chainId}
+                onDeploy={handleDeployToken}
+                isDeploying={isDeploying}
+                validationErrors={validationErrors}
+                connectWallet={connectWallet}
+                deployMode={deployMode}
+                setDeployMode={setDeployMode}
+              />
+            )}
 
             <TokenPreview 
-              formData={formData}
+              formData={createdTokenResult || formData}
               chainId={chainId}
               networkStats={networkStats}
             />
