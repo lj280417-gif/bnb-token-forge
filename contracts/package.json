@@ -1,0 +1,20 @@
+{
+  "name": "bsc-token-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for BEP-20 token generation on BNB Smart Chain",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test"
+  },
+  "keywords": ["bep20", "bsc", "binance", "smart-contract", "solidity"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.10"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "bnb-token-forge-workspace",
+  "version": "1.0.0",
+  "description": "Suite integral para la creación, configuración y despliegue de tokens BEP-20 en BNB Smart Chain",
+  "scripts": {
+    "server": "npm.cmd --prefix server start",
+    "client": "npm.cmd --prefix client run dev",
+    "test:contracts": "npm.cmd --prefix contracts test",
+    "compile:contracts": "npm.cmd --prefix contracts run compile"
+  },
+  "keywords": ["bsc", "bep20", "binance", "token", "crypto", "smart-contract"],
+  "author": "",
+  "license": "MIT"
+}

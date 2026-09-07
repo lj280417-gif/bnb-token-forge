@@ -1,0 +1,30 @@
+{
+  "name": "bsc-token-server",
+  "version": "1.0.0",
+  "description": "Backend API for BSC Token creation, verification and blockchain querying",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "sync-artifacts": "node scripts/sync-artifacts.js"
+  },
+  "keywords": [
+    "express",
+    "bsc",
+    "bep20",
+    "web3",
+    "bscscan"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.2",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0"
+  }
+}
